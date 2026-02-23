@@ -1,11 +1,21 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # Бұл жаңа жол
 from pydantic import BaseModel
 import requests
 import os
 
 app = FastAPI()
 
-# 1. Токенді жасырын түрде алу (Vercel-дегі HF_TOKEN айнымалысынан оқиды)
+# --- CORS БАПТАУЫ ОСЫ ЖЕРДЕ ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Барлық жерден сұраныс қабылдауға рұқсат
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, т.б. бәріне рұқсат
+    allow_headers=["*"],
+)
+# ------------------------------
+
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
@@ -15,15 +25,13 @@ class Message(BaseModel):
 
 @app.get("/")
 def home():
-    return {"status": "Cyber-Detective API is online", "model": "BART-Large-MNLI"}
+    return {"status": "Cyber-Detective API is online"}
 
 @app.post("/analyze")
 def analyze(msg: Message):
-    # API токенінің бар-жоғын тексеру
     if not HF_TOKEN:
-        return {"error": "HF_TOKEN табылған жоқ. Vercel-де Environment Variable ретінде қосыңыз."}
+        return {"error": "HF_TOKEN missing"}
 
-    # Алаяқтық санаттарын анықтауға арналған сұраныс
     payload = {
         "inputs": msg.text,
         "parameters": {"candidate_labels": ["fraud", "drugs", "spam", "safe", "illegal service"]}
@@ -33,27 +41,18 @@ def analyze(msg: Message):
         response = requests.post(API_URL, headers=headers, json=payload)
         result = response.json()
         
-        # Егер Hugging Face қате жіберсе немесе модель әлі жүктелмесе
+        # Модель оянып жатқан кездегі қатені ұстау
         if "error" in result:
-             return {"error": "Model is loading, please try again in a few seconds.", "details": result["error"]}
+             return {"error": "AI model is warming up, try again in 5s"}
 
-        # Нәтижелерді талдау
         top_label = result["labels"][0]
         top_score = result["scores"][0]
-        
-        # Қауіптілік деңгейін анықтау: егер ең жоғарғы санат 'safe' емес болса
-        # немесе 'safe' деңгейі тым төмен болса (мысалы 0.4-тен аз)
         is_safe = top_label == "safe" and top_score > 0.5
         
         return {
-            "text": msg.text,
             "verdict": "Таза" if is_safe else "Қауіпті",
-            "reason": top_label if not is_safe else "Normal text",
             "confidence": f"{round(top_score * 100, 2)}%",
-            "full_analysis": {
-                "labels": result.get("labels"),
-                "scores": [f"{round(s * 100, 2)}%" for s in result.get("scores")]
-            }
+            "reason": top_label
         }
     except Exception as e:
-        return {"error": "Сервермен байланыс кезінде қате шықты", "details": str(e)}
+        return {"error": str(e)}
