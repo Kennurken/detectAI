@@ -2,96 +2,116 @@
 <html lang="kk">
 <head>
   <meta charset="UTF-8">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
+    /* Негізгі стильдер (Tailwind-сіз де жұмыс істеу үшін) */
     body { 
       width: 380px; 
       background: #020617; 
       color: #f8fafc; 
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 16px;
       overflow-x: hidden;
     }
+
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .logo { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .logo-dot { width: 4px; height: 24px; background: #6366f1; border-radius: 4px; }
+    .badge { font-size: 10px; font-weight: bold; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(99, 102, 241, 0.2); }
+
     .glass-panel {
       background: rgba(30, 41, 59, 0.4);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
     }
-    .input-glass {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      transition: all 0.3s ease;
+
+    textarea {
+      width: 100%;
+      height: 100px;
+      background: transparent;
+      border: none;
+      color: #f1f5f9;
+      font-size: 14px;
+      resize: none;
+      outline: none;
     }
-    .input-glass:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+
+    .btn-group { display: grid; grid-template-cols: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-weight: bold;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
     }
-    .btn-ai {
-      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-ai:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.5);
-    }
+
+    .btn-primary { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; }
+    .btn-primary:hover { transform: translateY(-2px); opacity: 0.9; }
+    .btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+    .btn-secondary:hover { background: #334155; }
+
+    #result { display: none; } /* JS арқылы ашылады */
+    .result-card { border-left: 4px solid #6366f1; }
+    .verdict-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .verdict-text { font-weight: 800; font-size: 16px; }
+    .confidence { font-size: 10px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+    .reason { font-size: 12px; color: #cbd5e1; line-height: 1.5; margin: 0; }
+
     .scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
       height: 2px;
-      background: linear-gradient(90deg, transparent, #818cf8, transparent);
-      animation: scan 2s linear infinite;
+      background: #818cf8;
+      box-shadow: 0 0 8px #818cf8;
       display: none;
+      animation: scan 2s linear infinite;
     }
-    @keyframes scan {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(100px); }
-    }
+    @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
   </style>
 </head>
-<body class="p-4">
-  <div class="flex items-center justify-between mb-6 px-1">
+<body>
+  <div class="header">
     <div>
-      <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-        <span class="bg-indigo-500 w-2 h-6 rounded-full"></span>
-        Digital Trace
-      </h1>
-      <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">AI Cyber-Intelligence</p>
+      <div class="logo"><span class="logo-dot"></span> Digital Trace</div>
+      <div style="font-size: 10px; color: #94a3b8; font-weight: bold; margin-left: 12px; letter-spacing: 1px;">AI CYBER-INTELLIGENCE</div>
     </div>
-    <div class="flex flex-col items-end">
-      <div class="flex items-center gap-1.5">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-        </span>
-        <span class="text-[11px] font-semibold text-indigo-300">G 2.5 LITE</span>
-      </div>
-    </div>
+    <div class="badge">G 2.5 LITE</div>
   </div>
 
-  <div class="glass-panel rounded-2xl p-4 mb-4 relative overflow-hidden">
-    <div id="scanLine" class="scan-line absolute inset-x-0 top-0 z-10"></div>
-    <textarea id="msgInput" 
-      class="w-full h-28 bg-transparent border-none focus:ring-0 text-sm placeholder-slate-500 text-slate-200 resize-none" 
-      placeholder="Күдікті мәтінді немесе сілтемені осында қойыңыз..."></textarea>
+  <div class="glass-panel">
+    <div id="scanLine" class="scan-line"></div>
+    <textarea id="msgInput" placeholder="Күдікті мәтінді немесе сілтемені осында қойыңыз..."></textarea>
   </div>
 
-  <div class="grid grid-cols-2 gap-3 mb-5">
-    <button id="checkTextBtn" class="btn-ai text-white py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  <div class="btn-group">
+    <button id="checkTextBtn" class="btn-primary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Мәтінді талдау
     </button>
-    <button id="checkScreenBtn" class="bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-slate-200 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+    <button id="checkScreenBtn" class="btn-secondary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Экранды қарау
     </button>
   </div>
 
-  <div id="result" class="hidden transition-all duration-500">
-    <div id="resultCard" class="glass-panel rounded-2xl p-4 border-l-4">
-      <div class="flex items-start justify-between mb-2">
-        <h3 id="verdictLabel" class="font-extrabold text-base">Талдау нәтижесі</h3>
-        <span id="confidenceBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10"></span>
+  <div id="result">
+    <div id="resultCard" class="glass-panel result-card">
+      <div class="verdict-header">
+        <span id="verdictLabel" class="verdict-text">Талдау нәтижесі</span>
+        <span id="confidenceBadge" class="confidence"></span>
       </div>
-      <p id="reasonText" class="text-xs leading-relaxed text-slate-300"></p>
+      <p id="reasonText" class="reason"></p>
     </div>
   </div>
 
