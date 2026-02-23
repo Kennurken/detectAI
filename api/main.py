@@ -1,11 +1,14 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import os, requests, json, re
+import os
+import requests
+import json
+import re
 
-app = FastAPI()
+app = FastAPI(title="Cyber-Detective API")
 
-# Кез келген жерден келетін сұранысқа рұқсат беру
+# -------------------- CORS --------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,67 +17,64 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# -------------------- CONFIG --------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# Модель атын тұрақты v1beta нұсқасына қойдық
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+# СЕН СҰРАҒАН МОДЕЛЬ АТАУЫ (Gemini 2.5 Flash Lite)
+# Егер 404 қатесін берсе, атауын "gemini-2.5-flash-lite-preview" деп көруге болады
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+)
 
 class Message(BaseModel):
     text: str
 
-class ImageRequest(BaseModel):
-    image_base64: str
-
-# Жауапты CORS header-лерімен қайтару функциясы
-def prepare_response(data):
-    return JSONResponse(
-        content=data,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-from fastapi.responses import JSONResponse
-
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(request: Request, rest_of_path: str):
-    return prepare_response({"status": "ok"})
-
 @app.get("/")
-def health():
-    return prepare_response({"status": "online"})
+def home():
+    return {"status": "Cyber-Detective API Online", "model": GEMINI_MODEL}
 
 @app.post("/analyze")
-async def analyze(msg: Message):
-    prompt = f"Талдау жаса: {msg.text}. Жауапты тек JSON: {{\"verdict\": \"Таза/Қауіпті\", \"confidence\": 90, \"reason\": \"себебі\"}}"
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    
-    try:
-        res = requests.post(GEMINI_URL, json=payload, timeout=15)
-        data = res.json()
-        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-        return prepare_response(json.loads(match.group(0)) if match else {"error": "AI failure"})
-    except Exception as e:
-        return prepare_response({"error": str(e)})
+def analyze(msg: Message):
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
 
-@app.post("/analyze-screen")
-async def analyze_screen(req: ImageRequest):
-    prompt = "Скриншотта фишинг бар ма? Жауапты тек JSON: {\"verdict\": \"Таза/Қауіпті\", \"confidence\": 90, \"reason\": \"себебі\"}"
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt},
-                {"inline_data": {"mime_type": "image/jpeg", "data": req.image_base64}}
-            ]
-        }]
-    }
+    prompt = f"""
+    Сен кибер-қауіпсіздік маманысың. Мына мәтінді алаяқтыққа (scam) талда:
+    Текст: "{msg.text}"
+    
+    Жауапты ТЕК қана мына JSON форматында қайтар:
+    {{
+        "verdict": "Қауіпті" немесе "Таза",
+        "confidence": "0-100 арасындағы сан",
+        "reason": "қысқаша түсініктеме"
+    }}
+    """
+
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
     try:
-        res = requests.post(GEMINI_URL, json=payload, timeout=20)
-        data = res.json()
+        response = requests.post(GEMINI_URL, json=payload, timeout=20)
+        
+        # Егер модель табылмаса немесе API қате берсе
+        if response.status_code != 200:
+            return {
+                "error": "Gemini API error", 
+                "status_code": response.status_code,
+                "details": response.text,
+                "tip": "Модель атауын немесе API Key-ді тексеріңіз"
+            }
+
+        data = response.json()
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+
+        # JSON-ды Markdown-сыз тазалап алу
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-        return prepare_response(json.loads(match.group(0)) if match else {"error": "AI failure"})
+        if not match:
+            return {"error": "AI did not return valid JSON"}
+
+        return json.loads(match.group(0))
+
     except Exception as e:
-        return prepare_response({"error": str(e)})
+        raise HTTPException(status_code=500, detail=str(e))
