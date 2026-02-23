@@ -5,7 +5,7 @@ document.getElementById('checkBtn').addEventListener('click', async () => {
   resultDiv.innerText = "Талдау жасалуда...";
 
   try {
-    const response = await fetch('https://detect-ai-kennurken.vercel.app/analyze', {
+    const response = await fetch('https://detect-ai-silk.vercel.app/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text })
