@@ -1,135 +1,60 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import os
-import requests
-import json
-import re
-import base64 # Base64 кодтау/декодтау үшін
+import os, requests, json, re
 
-app = FastAPI(title="Cyber-Detective API")
+app = FastAPI()
 
-# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- CONFIG ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-GEMINI_MODEL = "gemini-2.0-flash-lite-preview-02-05" # Әлі де осыны қолданамыз, себебі бұл тұрақты
-# Егер 2.5 жұмыс істесе, соны жаз: "gemini-2.5-flash-lite"
-GEMINI_URL = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-)
+# СЕН СҰРАҒАН МОДЕЛЬ (Скриншот бойынша)
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 class Message(BaseModel):
     text: str
 
-class ImageAnalysisRequest(BaseModel):
-    image_base64: str # Base64 форматтағы сурет деректері
+class ImageRequest(BaseModel):
+    image_base64: str
 
-@app.get("/")
-def home():
-    return {"status": "Cyber-Detective API Online", "model": GEMINI_MODEL}
-
-# --- Мәтінді талдау ---
-@app.post("/analyze")
-def analyze(msg: Message):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
-
-    prompt = f"""
-    Сен кибер-сарапшысың. Мына мәтінді алаяқтыққа (scam) талда:
-    Текст: "{msg.text}"
-    
-    Жауапты ТЕК қана мына JSON форматында қайтар:
-    {{
-        "verdict": "Қауіпті" немесе "Таза",
-        "confidence": "0-100 арасындағы сан",
-        "reason": "қысқаша түсініктеме"
-    }}
-    """
-
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-
+def get_ai_response(payload):
     try:
-        response = requests.post(GEMINI_URL, json=payload, timeout=20)
-        
+        response = requests.post(GEMINI_URL, json=payload, timeout=30)
         if response.status_code != 200:
-            return {
-                "error": "Gemini API error", 
-                "status_code": response.status_code,
-                "details": response.text,
-                "tip": "Модель атауын немесе API Key-ді тексеріңіз"
-            }
-
+            return {"error": f"API Error {response.status_code}", "details": response.text}
+        
         data = response.json()
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-
+        
+        # JSON тазалау логикасы
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-        if not match:
-            return {"error": "AI did not return valid JSON"}
-
-        return json.loads(match.group(0))
-
+        if match:
+            return json.loads(match.group(0))
+        return {"error": "AI-дан JSON форматы келмеді", "raw": raw_text}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}
 
-# --- СКРИНШОТТЫ ТАЛДАУ (ЖАҢА) ---
+@app.post("/analyze")
+def analyze(msg: Message):
+    prompt = f"Сен кибер-сарапшысың. Мына мәтінді алаяқтыққа талда: '{msg.text}'. Жауапты ТЕК JSON форматында бер: {{\"verdict\": \"Қауіпті/Таза\", \"confidence\": 0-100, \"reason\": \"себебі\"}}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    return get_ai_response(payload)
+
 @app.post("/analyze-screen")
-def analyze_screen(request: ImageAnalysisRequest):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
-
-    # Image-ге арналған ерекше prompt
-    prompt = f"""
-    Сен кибер-сарапшысың. Мына скриншотты мұқият тексер.
-    Онда алаяқтық, фишинг, күмәнді сілтемелер, қауіпті батырмалар немесе басқа да зиянды белгілер бар ма?
-    Пайдаланушыға қауіпті екенін түсіндір, егер қауіп болмаса, қауіпсіз деп айт.
-
-    Жауапты ТЕК қана мына JSON форматында қайтар:
-    {{
-        "verdict": "Қауіпті" немесе "Таза",
-        "confidence": "0-100 арасындағы сан",
-        "reason": "Скриншоттағы қауіпті/қауіпсіз белгілерді түсіндір"
-    }}
-    """
-
+def analyze_screen(req: ImageRequest):
+    prompt = "Мына скриншотты кибер-қауіпсіздік тұрғысынан талда. Алаяқтық, фишинг немесе күдікті әрекет бар ма? Жауапты ТЕК JSON форматында бер: {{\"verdict\": \"Қауіпті/Таза\", \"confidence\": 0-100, \"reason\": \"себебі\"}}"
     payload = {
         "contents": [{
             "parts": [
                 {"text": prompt},
-                {"inline_data": {"mime_type": "image/jpeg", "data": request.image_base64}}
+                {"inline_data": {"mime_type": "image/jpeg", "data": req.image_base64}}
             ]
         }]
     }
-
-    try:
-        response = requests.post(GEMINI_URL, json=payload, timeout=60) # Сурет ауыр болғандықтан timeout-ты арттырдық
-        
-        if response.status_code != 200:
-            print(f"Gemini Vision API Error: {response.text}")
-            return {
-                "error": "Gemini Vision API-мен байланыс үзілді",
-                "details": response.json().get("error", {}).get("message", "Unknown error for image analysis"),
-                "tip": "Gemini Vision API Key немесе модельді тексеріңіз"
-            }
-
-        data = response.json()
-        # Жауап текстін алу
-        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-        
-        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-        if not match:
-            return {"error": "AI did not return valid JSON for image analysis"}
-
-        return json.loads(match.group(0))
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image analysis error: {str(e)}")
+    return get_ai_response(payload)

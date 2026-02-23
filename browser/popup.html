@@ -1,35 +1,30 @@
 <!DOCTYPE html>
-<html lang="kk">
+<html>
 <head>
   <meta charset="UTF-8">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { width: 350px; background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-    .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); transition: all 0.3s ease; }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); }
+    body { width: 360px; background: #0b0f19; color: #e5e7eb; font-family: 'Inter', sans-serif; }
+    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+    .neon-btn { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
   </style>
 </head>
-<body class="p-4">
-  <div class="flex items-center space-between mb-4">
-    <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">AI Detective</h1>
-    <span class="ml-auto flex h-2 w-2 rounded-full bg-green-500"></span>
+<body class="p-5">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-extrabold tracking-tight text-white">AI Detective <span class="text-xs font-normal text-purple-400">v2.5</span></h1>
+    <div class="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></div>
   </div>
 
-  <div class="glass rounded-xl p-3 mb-4">
-    <textarea id="msgInput" class="w-full bg-transparent border-none focus:ring-0 text-sm placeholder-gray-500 resize-none h-24" placeholder="Тексеретін мәтінді енгізіңіз..."></textarea>
+  <div class="glass-card rounded-2xl p-4 mb-5">
+    <textarea id="msgInput" class="w-full bg-transparent border-none focus:ring-0 text-sm placeholder-slate-500 h-24 resize-none" placeholder="Күдікті мәтінді осында қойыңыз..."></textarea>
   </div>
 
-  <div class="space-y-2">
-    <button id="checkTextBtn" class="btn-primary w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center">
-      🔍 Мәтінді тексеру
-    </button>
-    <button id="checkScreenBtn" class="w-full py-2.5 rounded-lg font-medium text-sm border border-gray-700 hover:bg-gray-800 transition-colors flex items-center justify-center">
-      🖥 Экранды тексеру
-    </button>
+  <div class="grid grid-cols-2 gap-3 mb-6">
+    <button id="checkTextBtn" class="neon-btn text-white py-3 rounded-xl text-sm font-semibold hover:opacity-90 transition-all">Мәтінді талдау</button>
+    <button id="checkScreenBtn" class="bg-slate-800 border border-slate-700 text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-700 transition-all">Экранды қарау</button>
   </div>
 
-  <div id="result" class="mt-4 p-3 rounded-lg text-sm hidden glass">
+  <div id="result" class="hidden glass-card rounded-2xl p-4 transition-all duration-500">
     </div>
 
   <script src="popup.js"></script>
