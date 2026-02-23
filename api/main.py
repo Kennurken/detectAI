@@ -6,16 +6,16 @@ import os
 
 app = FastAPI()
 
-# --- CORS рұқсатын қосу ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Барлық жерден сұраныс қабылдауға рұқсат береді
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 HF_TOKEN = os.getenv("HF_TOKEN")
+# Көптілді ең мықты модельдердің бірі
 API_URL = "https://api-inference.huggingface.co/models/symanto/xlm-roberta-base-snli-mnli"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
@@ -31,11 +31,15 @@ def analyze(msg: Message):
     if not HF_TOKEN:
         return {"error": "HF_TOKEN missing"}
 
-    # Көптілді модель үшін мағыналы санаттар
+    # Санаттарды барынша нақты алаяқтыққа бағыттаймыз
+    # "urgent scam" сөзі модельді сақ болуға мәжбүрлейді
     payload = {
         "inputs": msg.text,
         "parameters": {
-            "candidate_labels": ["suspicious scam or fraud", "normal safe conversation"]
+            "candidate_labels": [
+                "fraudulent scam money request", 
+                "safe friendly chat"
+            ]
         }
     }
     
@@ -49,16 +53,22 @@ def analyze(msg: Message):
         top_label = result["labels"][0]
         top_score = result["scores"][0]
         
-        # Егер модель 'scam' екеніне сенімді болса
-        is_fraud = "scam" in top_label
+        # Егер модель 'fraudulent' немесе 'scam' екеніне тіпті 30% сенімді болса - Қауіпті деп береміз
+        is_scam = "scam" in top_label or "fraud" in top_label
         
-        # Хакатонда эффект болуы үшін: егер сенімділік 40%-дан асса, күдікті деп атаймыз
-        verdict = "Қауіпті" if (is_fraud and top_score > 0.4) else "Таза"
+        # Хакатон үшін сезімталдықты арттыру: 0.3 threshold
+        if is_scam and top_score > 0.3:
+            verdict = "Қауіпті"
+            reason = "Алаяқтық белгілері анықталды"
+        else:
+            verdict = "Таза"
+            reason = "Қауіпсіз хабарлама"
         
         return {
             "verdict": verdict,
             "confidence": f"{round(top_score * 100, 2)}%",
-            "reason": "Алаяқтық белгілері" if verdict == "Қауіпті" else "Қауіпсіз хабарлама"
+            "reason": reason,
+            "ai_logic": top_label # Мұны презентацияда көрсетуге болады
         }
     except Exception as e:
         return {"error": str(e)}
