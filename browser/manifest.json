@@ -1,25 +1,16 @@
 {
   "manifest_version": 3,
   "name": "AI Cyber-Detective",
-  "version": "1.1",
-  "description": "Telegram хабарламалары мен экранды AI арқылы қауіпсіздікке талдау",
+  "version": "1.2",
+  "description": "Экранды және мәтінді AI арқылы қауіпсіздікке талдау",
   "permissions": [
     "activeTab",
-    "tabs",
-    "scripting"
+    "tabs"
   ],
   "host_permissions": [
     "https://detect-ai-silk.vercel.app/*"
   ],
   "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "default_popup": "popup.html"
   }
 }
