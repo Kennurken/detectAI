@@ -15,7 +15,6 @@ app.add_middleware(
 )
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-# Көптілді ең мықты модельдердің бірі
 API_URL = "https://api-inference.huggingface.co/models/symanto/xlm-roberta-base-snli-mnli"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
@@ -31,14 +30,14 @@ def analyze(msg: Message):
     if not HF_TOKEN:
         return {"error": "HF_TOKEN missing"}
 
-    # Санаттарды барынша нақты алаяқтыққа бағыттаймыз
-    # "urgent scam" сөзі модельді сақ болуға мәжбүрлейді
+    # Бұл жерде біз модельге "не іздеу керек" екенін нақты айтамыз.
+    # "financial scam" және "money request" сөздері алаяқтықты табуға көмектеседі.
     payload = {
         "inputs": msg.text,
         "parameters": {
             "candidate_labels": [
-                "fraudulent scam money request", 
-                "safe friendly chat"
+                "fraudulent money scam request", 
+                "legitimate friendly conversation"
             ]
         }
     }
@@ -50,16 +49,24 @@ def analyze(msg: Message):
         if "error" in result:
              return {"error": "AI модель оянуда, 5 секундтан соң қайталаңыз..."}
 
-        top_label = result["labels"][0]
-        top_score = result["scores"][0]
+        # Нәтижелерді алу
+        labels = result.get("labels", [])
+        scores = result.get("scores", [])
         
-        # Егер модель 'fraudulent' немесе 'scam' екеніне тіпті 30% сенімді болса - Қауіпті деп береміз
-        is_scam = "scam" in top_label or "fraud" in top_label
+        if not labels:
+            return {"error": "AI-дан жауап келмеді"}
+
+        top_label = labels[0]
+        top_score = scores[0]
         
-        # Хакатон үшін сезімталдықты арттыру: 0.3 threshold
+        # Егер ең бірінші таңдалған санат "fraudulent" (алаяқтық) болса, 
+        # тіпті оның ұпайы 30% (0.3) болса да, біз оны Қауіпті деп белгілейміз.
+        is_scam = "fraudulent" in top_label
+        
+        # Шекті барынша төмендеттік (0.3), себебі бізге "өте сақ" детектив керек
         if is_scam and top_score > 0.3:
             verdict = "Қауіпті"
-            reason = "Алаяқтық белгілері анықталды"
+            reason = "Алаяқтық белгілері анықталды (күдікті ақша сұрау)"
         else:
             verdict = "Таза"
             reason = "Қауіпсіз хабарлама"
@@ -68,7 +75,7 @@ def analyze(msg: Message):
             "verdict": verdict,
             "confidence": f"{round(top_score * 100, 2)}%",
             "reason": reason,
-            "ai_logic": top_label # Мұны презентацияда көрсетуге болады
+            "debug": top_label # Бұл модельдің іштей не таңдағанын көру үшін
         }
     except Exception as e:
         return {"error": str(e)}
