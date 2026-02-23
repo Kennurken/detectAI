@@ -2,11 +2,19 @@
   "manifest_version": 3,
   "name": "Digital Trace AI",
   "version": "1.0",
-  "permissions": ["activeTab", "tabs"],
+  "description": "AI-powered cyber threat detection extension",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting"
+  ],
   "host_permissions": [
-    "https://detect-ai-kennurken.vercel.app/*" 
+    "https://detect-ai-kennurken.vercel.app/*"
   ],
   "action": {
-    "default_popup": "index.html" 
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }
