@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import requests
 import os
+import requests
 
 app = FastAPI()
 
@@ -14,68 +14,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-API_URL = "https://api-inference.huggingface.co/models/symanto/xlm-roberta-base-snli-mnli"
-headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 class Message(BaseModel):
     text: str
 
-@app.get("/")
-def home():
-    return {"status": "Cyber-Detective API is online"}
-
 @app.post("/analyze")
 def analyze(msg: Message):
-    if not HF_TOKEN:
-        return {"error": "HF_TOKEN missing"}
+    if not OPENAI_API_KEY:
+        return {"error": "OpenAI API Key missing"}
 
-    # Бұл жерде біз модельге "не іздеу керек" екенін нақты айтамыз.
-    # "financial scam" және "money request" сөздері алаяқтықты табуға көмектеседі.
-    payload = {
-        "inputs": msg.text,
-        "parameters": {
-            "candidate_labels": [
-                "fraudulent money scam request", 
-                "legitimate friendly conversation"
-            ]
-        }
-    }
+    # GPT-ге нақты нұсқаулық (Prompt) береміз
+    prompt = f"""
+    Сен кибер-қауіпсіздік маманысың. Мына мәтінді талдап, оның алаяқтық (scam) екенін анықта:
+    "{msg.text}"
     
+    Жауапты қатаң түрде мына JSON форматында қайтар:
+    {{
+        "verdict": "Қауіпті" немесе "Таза",
+        "confidence": "0-100% арасында",
+        "reason": "Қысқаша себебі"
+    }}
+    """
+
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0
+    }
+
     try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = response.json()
+        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        res_data = response.json()
         
-        if "error" in result:
-             return {"error": "AI модель оянуда, 5 секундтан соң қайталаңыз..."}
-
-        # Нәтижелерді алу
-        labels = result.get("labels", [])
-        scores = result.get("scores", [])
+        # GPT-ден келген мәтінді (JSON-ды) оқу
+        import json
+        ai_response = json.loads(res_data['choices'][0]['message']['content'])
         
-        if not labels:
-            return {"error": "AI-дан жауап келмеді"}
-
-        top_label = labels[0]
-        top_score = scores[0]
-        
-        # Егер ең бірінші таңдалған санат "fraudulent" (алаяқтық) болса, 
-        # тіпті оның ұпайы 30% (0.3) болса да, біз оны Қауіпті деп белгілейміз.
-        is_scam = "fraudulent" in top_label
-        
-        # Шекті барынша төмендеттік (0.3), себебі бізге "өте сақ" детектив керек
-        if is_scam and top_score > 0.3:
-            verdict = "Қауіпті"
-            reason = "Алаяқтық белгілері анықталды (күдікті ақша сұрау)"
-        else:
-            verdict = "Таза"
-            reason = "Қауіпсіз хабарлама"
-        
-        return {
-            "verdict": verdict,
-            "confidence": f"{round(top_score * 100, 2)}%",
-            "reason": reason,
-            "debug": top_label # Бұл модельдің іштей не таңдағанын көру үшін
-        }
+        return ai_response
     except Exception as e:
         return {"error": str(e)}
