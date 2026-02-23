@@ -5,10 +5,11 @@ import os
 import requests
 import json
 import re
+import base64 # Base64 кодтау/декодтау үшін
 
 app = FastAPI(title="Cyber-Detective API")
 
-# -------------------- CORS --------------------
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,12 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------------------- CONFIG --------------------
+# --- CONFIG ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# СЕН СҰРАҒАН МОДЕЛЬ АТАУЫ (Gemini 2.5 Flash Lite)
-# Егер 404 қатесін берсе, атауын "gemini-2.5-flash-lite-preview" деп көруге болады
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-2.0-flash-lite-preview-02-05" # Әлі де осыны қолданамыз, себебі бұл тұрақты
+# Егер 2.5 жұмыс істесе, соны жаз: "gemini-2.5-flash-lite"
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
@@ -31,17 +31,21 @@ GEMINI_URL = (
 class Message(BaseModel):
     text: str
 
+class ImageAnalysisRequest(BaseModel):
+    image_base64: str # Base64 форматтағы сурет деректері
+
 @app.get("/")
 def home():
     return {"status": "Cyber-Detective API Online", "model": GEMINI_MODEL}
 
+# --- Мәтінді талдау ---
 @app.post("/analyze")
 def analyze(msg: Message):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
 
     prompt = f"""
-    Сен кибер-қауіпсіздік маманысың. Мына мәтінді алаяқтыққа (scam) талда:
+    Сен кибер-сарапшысың. Мына мәтінді алаяқтыққа (scam) талда:
     Текст: "{msg.text}"
     
     Жауапты ТЕК қана мына JSON форматында қайтар:
@@ -57,7 +61,6 @@ def analyze(msg: Message):
     try:
         response = requests.post(GEMINI_URL, json=payload, timeout=20)
         
-        # Егер модель табылмаса немесе API қате берсе
         if response.status_code != 200:
             return {
                 "error": "Gemini API error", 
@@ -69,7 +72,6 @@ def analyze(msg: Message):
         data = response.json()
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
 
-        # JSON-ды Markdown-сыз тазалап алу
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not match:
             return {"error": "AI did not return valid JSON"}
@@ -78,3 +80,56 @@ def analyze(msg: Message):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- СКРИНШОТТЫ ТАЛДАУ (ЖАҢА) ---
+@app.post("/analyze-screen")
+def analyze_screen(request: ImageAnalysisRequest):
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
+
+    # Image-ге арналған ерекше prompt
+    prompt = f"""
+    Сен кибер-сарапшысың. Мына скриншотты мұқият тексер.
+    Онда алаяқтық, фишинг, күмәнді сілтемелер, қауіпті батырмалар немесе басқа да зиянды белгілер бар ма?
+    Пайдаланушыға қауіпті екенін түсіндір, егер қауіп болмаса, қауіпсіз деп айт.
+
+    Жауапты ТЕК қана мына JSON форматында қайтар:
+    {{
+        "verdict": "Қауіпті" немесе "Таза",
+        "confidence": "0-100 арасындағы сан",
+        "reason": "Скриншоттағы қауіпті/қауіпсіз белгілерді түсіндір"
+    }}
+    """
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": "image/jpeg", "data": request.image_base64}}
+            ]
+        }]
+    }
+
+    try:
+        response = requests.post(GEMINI_URL, json=payload, timeout=60) # Сурет ауыр болғандықтан timeout-ты арттырдық
+        
+        if response.status_code != 200:
+            print(f"Gemini Vision API Error: {response.text}")
+            return {
+                "error": "Gemini Vision API-мен байланыс үзілді",
+                "details": response.json().get("error", {}).get("message", "Unknown error for image analysis"),
+                "tip": "Gemini Vision API Key немесе модельді тексеріңіз"
+            }
+
+        data = response.json()
+        # Жауап текстін алу
+        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        if not match:
+            return {"error": "AI did not return valid JSON for image analysis"}
+
+        return json.loads(match.group(0))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image analysis error: {str(e)}")
