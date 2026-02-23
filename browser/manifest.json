@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "AI Cyber-Detective",
+  "version": "1.0",
+  "description": "Telegram-дағы заңсыз хабарламаларды AI арқылы анықтау",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
