@@ -20,8 +20,8 @@ app.add_middleware(
 # -------------------- CONFIG --------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Нақты жұмыс істейтін модель атауы
-GEMINI_MODEL = "gemini-1.5-flash" 
+# СЕН СҰРАҒАН МОДЕЛЬ: gemini-2.5-flash-lite
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 class Message(BaseModel):
@@ -34,7 +34,7 @@ class ImageRequest(BaseModel):
 def home():
     return {"status": "Cyber-Detective API Online", "model": GEMINI_MODEL}
 
-# 1. МӘТІНДІ ТАЛДАУ
+# 1. МӘТІНДІ ТАЛДАУ (Ескі функция сақталды)
 @app.post("/analyze")
 def analyze(msg: Message):
     if not GEMINI_API_KEY:
@@ -47,21 +47,20 @@ def analyze(msg: Message):
     Жауапты ТЕК қана мына JSON форматында қайтар:
     {{
         "verdict": "Қауіпті" немесе "Таза",
-        "confidence": 0-100 арасындағы сан,
+        "confidence": 0,
         "reason": "қысқаша түсініктеме"
     }}
     """
-
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     return call_gemini(payload)
 
-# 2. СКРИНШОТТЫ ТАЛДАУ (Осы жер жетіспей тұрған еді!)
+# 2. СКРИНШОТТЫ ТАЛДАУ (Жаңа қосылған функция)
 @app.post("/analyze-screen")
 def analyze_screen(req: ImageRequest):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
 
-    prompt = "Мына скриншотта алаяқтық (фишинг, жалған ұтыс, күмәнді сілтеме) бар ма? JSON форматында жауап бер: verdict (Қауіпті/Таза), confidence (0-100), reason (себебі)."
+    prompt = "Мына скриншотты талда. Егер алаяқтық болса 'Қауіпті', болмаса 'Таза' деп жауап бер. Формат ТЕК JSON: verdict, confidence (0-100), reason."
 
     payload = {
         "contents": [{
@@ -78,19 +77,25 @@ def analyze_screen(req: ImageRequest):
     }
     return call_gemini(payload)
 
-# Gemini-мен байланыс функциясы
+# Ортақ жіберу функциясы
 def call_gemini(payload):
     try:
         response = requests.post(GEMINI_URL, json=payload, timeout=30)
+        
         if response.status_code != 200:
-            return {"error": "API Error", "details": response.text}
+            return {
+                "error": "Gemini API error",
+                "status": response.status_code,
+                "details": response.json()
+            }
 
         data = response.json()
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
         
+        # JSON-ды мәтін ішінен тауып алу
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not match:
-            return {"error": "AI did not return valid JSON", "raw": raw_text}
+            return {"error": "AI did not return valid JSON", "text": raw_text}
             
         return json.loads(match.group(0))
     except Exception as e:
