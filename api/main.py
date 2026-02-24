@@ -29,6 +29,27 @@ class Message(BaseModel):
 
 class ImageRequest(BaseModel):
     image_base64: str
+class URLRequest(BaseModel):
+    url: str
+
+@app.post("/analyze-url")
+def analyze_url(req: URLRequest):
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
+
+    prompt = f"""
+    Сен кибер-қауіпсіздік маманысың. Мына сілтемені (URL) фишинг немесе алаяқтыққа тексер:
+    Сілтеме: "{req.url}"
+    
+    Жауапты ТЕК қана мына JSON форматында қайтар:
+    {{
+        "verdict": "Қауіпті" немесе "Таза",
+        "confidence": 0-100,
+        "reason": "қысқаша түсініктеме (мысалы: домен күмәнді немесе ресми сайтқа ұқсайды)"
+    }}
+    """
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    return call_gemini(payload)
 
 @app.get("/")
 def home():

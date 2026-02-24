@@ -118,4 +118,29 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+  const checkUrlBtn = document.getElementById('checkUrlBtn');
+
+checkUrlBtn.addEventListener('click', () => {
+  setLoading(true);
+  
+  // Браузердегі ашық тұрған табты (сілтемені) алу
+  chrome.tabs.query({active: true, currentWindow: true}, async (tabs) => {
+    const currentUrl = tabs[0].url;
+    console.log("Тексерілетін сілтеме:", currentUrl);
+
+    try {
+      const response = await fetch(`${API_URL}/analyze-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: currentUrl })
+      });
+
+      const data = await response.json();
+      displayResult(data);
+    } catch (error) {
+      console.error("URL Error:", error);
+      displayResult({ error: "Сілтемені тексеру мүмкін болмады." });
+    }
+  });
+});
 });
