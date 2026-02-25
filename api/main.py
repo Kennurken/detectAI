@@ -6,7 +6,7 @@ import requests
 import json
 import re
 
-app = FastAPI(title="Cyber-Detective API")
+app = FastAPI(title="Digital Trace AI API")
 
 # -------------------- CORS --------------------
 app.add_middleware(
@@ -19,67 +19,47 @@ app.add_middleware(
 
 # -------------------- CONFIG --------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+# МОДЕЛЬ АТАУЫН ТҮЗЕТТІК: gemini-2.0-flash (қазіргі ең жылдамы)
+GEMINI_MODEL = "gemini-2.0-flash" 
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-class Message(BaseModel):
-    text: str
+# Деректер модельдері
+class URLRequest(BaseModel):
+    url: str
 
 class ImageRequest(BaseModel):
     image_base64: str
 
-class URLRequest(BaseModel):
-    url: str
-
 @app.get("/")
 def home():
-    return {"status": "Cyber-Detective API Online", "model": GEMINI_MODEL}
+    return {"status": "Digital Trace AI Online", "model": GEMINI_MODEL}
 
-# 1. СІЛТЕМЕНІ ТАЛДАУ (URL)
-@app.post("/analyze-url")
-def analyze_url(req: URLRequest):
+# 1. СІЛТЕМЕНІ ЖӘНЕ МӘТІНДІ ТАЛДАУ (/check)
+@app.post("/check")
+def check_content(req: URLRequest):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
 
     prompt = f"""
-    Сен кибер-қауіпсіздік маманысың. Мына сілтемені (URL) фишингке тексер: "{req.url}"
-    
-    Ережелер:
-    1. Шешімің қауіпсіз болса "verdict": "Таза", қауіпті болса "Қауіпті" деп жаз.
-    2. "confidence": Өз шешіміңе қаншалықты сенімдісің? (0-100 арасында сан). Мысалы, ресми сайт болса 100 деп бер.
-    3. "reason": Қысқаша қазақша түсіндірме.
-    
-    Жауапты ТЕК JSON форматында қайтар.
-    """
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    return call_gemini(payload)
-
-# 2. МӘТІНДІ ТАЛДАУ (Text)
-@app.post("/analyze")
-def analyze(msg: Message):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
-
-    prompt = f"""
-    Мына мәтінді алаяқтыққа талда: "{msg.text}"
-    
-    Жауап форматы (JSON):
+    Сен Digital Trace AI жүйесісің. Мына сілтемені немесе мәтінді фишингке/алаяқтыққа тексер: "{req.url}"
+    Жауапты ТЕК JSON форматында қайтар:
     {{
         "verdict": "Қауіпті" немесе "Таза",
-        "confidence": 0-100 (сенімділік деңгейі),
-        "reason": "себебі"
+        "scam_score": 0-100,
+        "detail": "Қысқаша қазақша түсіндірме"
     }}
     """
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     return call_gemini(payload)
 
-# 3. СКРИНШОТТЫ ТАЛДАУ (Vision)
+# 2. ЭКРАНДЫ (СКРИНШОТТЫ) ТАЛДАУ (/analyze-screen)
 @app.post("/analyze-screen")
 def analyze_screen(req: ImageRequest):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY missing")
 
-    prompt = "Мына скриншотты талда. Алаяқтық белгілері бар ма? JSON форматында жауап бер: verdict (Қауіпті/Таза), confidence (0-100), reason (қазақша түсініктеме)."
+    # Vision үшін арнайы промпт
+    prompt = "Сен Digital Trace AI жүйесісің. Мына скриншотты талда. Алаяқтық белгілері, фишингтік сайт немесе күмәнді хабарлама бар ма? Жауапты ТЕК JSON форматында бер: verdict (Қауіпті/Таза), scam_score (0-100), detail (қазақша түсіндірме)."
 
     payload = {
         "contents": [{
@@ -95,15 +75,27 @@ def analyze_screen(req: ImageRequest):
 def call_gemini(payload):
     try:
         response = requests.post(GEMINI_URL, json=payload, timeout=30)
+        
         if response.status_code != 200:
-            return {"error": "API error", "status": response.status_code}
+            return {"error": "API error", "status": response.status_code, "msg": response.text}
 
         data = response.json()
+        
+        if "candidates" not in data or not data["candidates"]:
+            return {"error": "AI жауап бермеді", "raw": data}
+
         raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # JSON-ды мәтін ішінен тауып алу
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-        if not match:
-            return {"error": "Invalid AI response"}
-            
-        return json.loads(match.group(0))
+        
+        if match:
+            res = json.loads(match.group(0))
+            return {
+                "verdict": res.get("verdict", "Белгісіз"),
+                "scam_score": res.get("scam_score", res.get("confidence", 0)),
+                "detail": res.get("detail", res.get("reason", "Талдау аяқталды"))
+            }
+        return {"error": "AI жауабы форматқа сай емес"}
     except Exception as e:
         return {"error": str(e)}
