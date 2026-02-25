@@ -20,7 +20,7 @@ app.add_middleware(
 # -------------------- CONFIG --------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # МОДЕЛЬ АТАУЫН ТҮЗЕТТІК: gemini-2.0-flash (қазіргі ең жылдамы)
-GEMINI_MODEL = "gemini-2.5-flash-lite" 
+GEMINI_MODEL = "gemini-2.5-flash" 
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 # Деректер модельдері
