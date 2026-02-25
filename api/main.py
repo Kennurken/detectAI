@@ -18,7 +18,7 @@ app.add_middleware(
 
 # КОНФИГУРАЦИЯ
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-3-flash" 
+GEMINI_MODEL = "gemini-3.0-flash" 
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
 class URLRequest(BaseModel):
