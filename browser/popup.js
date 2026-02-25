@@ -14,10 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   console.log("Digital Trace: Скрипт іске қосылды");
 
-  // Жүктеу күйін басқару (барлық батырмалар үшін)
   function setLoading(isLoading) {
     const buttons = [checkTextBtn, checkScreenBtn, checkUrlBtn];
-    
     buttons.forEach(btn => {
       if (btn) {
         btn.disabled = isLoading;
@@ -27,7 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (isLoading) {
-      console.log("Талдау басталды...");
       resultDiv.style.display = 'none';
       if (scanLine) scanLine.style.display = 'block';
     } else {
@@ -35,13 +32,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Нәтижені экранға шығару
   function displayResult(data) {
     setLoading(false);
     resultDiv.style.display = 'block'; 
     
     if (data.error) {
-      console.error("Сервер қатесі:", data.error);
       verdictLabel.innerText = "⚠️ ҚАТЕ";
       verdictLabel.style.color = "#f59e0b";
       reasonText.innerText = data.details || data.error;
@@ -51,7 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const isDanger = data.verdict === "Қауіпті";
-    
     resultCard.style.borderLeftColor = isDanger ? "#ef4444" : "#10b981";
     verdictLabel.style.color = isDanger ? "#f87171" : "#34d399";
     verdictLabel.innerText = isDanger ? "❌ ҚАУІПТІ" : "✅ ТАЗА";
@@ -60,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
     confidenceBadge.innerText = `${confidence}% Сенім`;
     confidenceBadge.style.background = isDanger ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)";
     confidenceBadge.style.color = isDanger ? "#f87171" : "#34d399";
-    
     reasonText.innerText = data.reason || "Талдау аяқталды.";
   }
 
@@ -69,7 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
     checkTextBtn.addEventListener('click', async () => {
       const text = msgInput.value.trim();
       if (!text) return alert("Мәтінді жазыңыз");
-
       setLoading(true);
       try {
           const response = await fetch(`${API_URL}/analyze`, {
@@ -77,11 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: text })
           });
-          const data = await response.json();
-          displayResult(data);
+          displayResult(await response.json());
       } catch (error) {
-          console.error("Fetch Error:", error);
-          displayResult({ error: "Байланыс үзілді", details: "Сервер жауап бермеді." });
+          displayResult({ error: "Байланыс үзілді" });
       }
     });
   }
@@ -95,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
           displayResult({ error: "Скриншот алу мүмкін болмады." });
           return;
         }
-
         const base64Data = dataUrl.split(',')[1];
         try {
           const response = await fetch(`${API_URL}/analyze-screen`, {
@@ -103,10 +92,9 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image_base64: base64Data })
           });
-          const data = await response.json();
-          displayResult(data);
+          displayResult(await response.json());
         } catch (error) {
-          displayResult({ error: "Vision қатесі", details: error.message });
+          displayResult({ error: "Vision қатесі" });
         }
       });
     });
@@ -117,17 +105,16 @@ document.addEventListener('DOMContentLoaded', function() {
     checkUrlBtn.addEventListener('click', () => {
       setLoading(true);
       chrome.tabs.query({active: true, currentWindow: true}, async (tabs) => {
-        const currentUrl = tabs[0].url;
+        if (!tabs[0]) return;
         try {
           const response = await fetch(`${API_URL}/analyze-url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: currentUrl })
+            body: JSON.stringify({ url: tabs[0].url })
           });
-          const data = await response.json();
-          displayResult(data);
+          displayResult(await response.json());
         } catch (error) {
-          displayResult({ error: "URL қатесі", details: error.message });
+          displayResult({ error: "URL қатесі" });
         }
       });
     });

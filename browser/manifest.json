@@ -2,13 +2,13 @@
   "manifest_version": 3,
   "name": "Digital Trace AI",
   "version": "1.2",
+  "description": "AI-powered cyber threat detection",
   "permissions": [
     "activeTab",
     "tabs",
     "scripting",
     "storage",
-    "notifications",
-    "alarms"
+    "notifications"
   ],
   "background": {
     "service_worker": "background.js"
